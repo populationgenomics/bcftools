@@ -3450,7 +3450,7 @@ int test_splice(args_t *args, bcf1_t *rec)
     free(splice.kalt.s);
     return ret;
 }
-int test_tscript(args_t *args, bcf1_t *rec)
+int test_tscript(args_t *args, bcf1_t *rec, int coding_already_hit)
 {
     const char *chr_vcf = bcf_seqname(args->hdr,rec);
     const char *chr_gff = unify_chr_name(args, chr_vcf, CHR_VCF,CHR_GFF);
@@ -3463,6 +3463,10 @@ int test_tscript(args_t *args, bcf1_t *rec)
     while ( regitr_overlap(args->itr) )
     {
         gf_tscript_t *tr = splice.tr = regitr_payload(args->itr, gf_tscript_t*);
+        // intron of a coding transcript is the only consequence test_tscript would emit
+        // for it, but test_cds/test_utr/test_splice already covered that transcript;
+        // skip to avoid duplicate "intron" annotation alongside e.g. "5_prime_utr"
+        if ( coding_already_hit && GF_is_coding(tr->type) ) continue;
         for (i=1; i<rec->n_allele; i++)
         {
             if ( rec->d.allele[i][0]=='<' || rec->d.allele[i][0]=='*' ) { continue; }
@@ -3691,7 +3695,7 @@ static void process(args_t *args, bcf1_t **rec_ptr)
         int hit = args->local_csq ? test_cds_local(args, rec) : test_cds(args, rec, vbuf);
         hit += test_utr(args, rec);
         hit += test_splice(args, rec);
-        if ( !hit ) test_tscript(args, rec);
+        test_tscript(args, rec, hit);
     }
     else
         test_symbolic_alt(args, rec);
@@ -3949,4 +3953,3 @@ int main_csq(int argc, char *argv[])
     free(args);
     return 0;
 }
-
